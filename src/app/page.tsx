@@ -223,6 +223,17 @@ export default function Home() {
     setName(getStored("kb:name", "richie"));
   }, []);
 
+  // Keep an in-memory copy for mobile webviews that sometimes break localStorage across routes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    (window as any).__CLAWD_KANBAN__ = {
+      token,
+      owner,
+      repo,
+      name,
+    };
+  }, [token, owner, repo, name]);
+
   const columns = useMemo(() => {
     const byColumn: Record<ColumnId, Issue[]> = {
       todo: [],

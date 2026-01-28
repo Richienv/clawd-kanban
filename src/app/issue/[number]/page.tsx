@@ -48,10 +48,19 @@ export default function IssuePage({ params }: { params: { number: string } }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    setOwner(getStored("kb:owner", "Richienv"));
-    setRepo(getStored("kb:repo", "clawd-kanban"));
-    setToken(getStored("kb:token"));
+    setMounted(true);
+    // prefer in-memory context from the board page (works better on some mobile webviews)
+    const mem = typeof window !== "undefined" ? (window as any).__CLAWD_KANBAN__ : null;
+    const o = mem?.owner || getStored("kb:owner", "Richienv");
+    const r = mem?.repo || getStored("kb:repo", "clawd-kanban");
+    const t = mem?.token || getStored("kb:token");
+
+    setOwner(o);
+    setRepo(r);
+    setToken(t);
   }, []);
 
   useEffect(() => {
@@ -98,6 +107,18 @@ export default function IssuePage({ params }: { params: { number: string } }) {
           </div>
         ) : null}
 
+        {!mounted ? (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-300">
+            Loading…
+          </div>
+        ) : null}
+
+        {mounted && !token ? (
+          <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-300">
+            No token found in this browser session. Go back and paste your token.
+          </div>
+        ) : null}
+
         {issue ? (
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -137,11 +158,6 @@ export default function IssuePage({ params }: { params: { number: string } }) {
           </div>
         ) : null}
 
-        {!token ? (
-          <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-300">
-            No token found in this browser. Go back and paste your token.
-          </div>
-        ) : null}
       </div>
     </div>
   );
