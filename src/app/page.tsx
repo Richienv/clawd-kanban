@@ -1,7 +1,17 @@
 "use client";
 
-import { DndContext, DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type ColumnId = "todo" | "doing" | "done";
@@ -96,45 +106,62 @@ async function ghFetch<T>(
 }
 
 function Card({ issue, col }: { issue: Issue; col: ColumnId }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `issue:${issue.number}`,
-    data: { from: col, issueNumber: issue.number },
-  });
+  const router = useRouter();
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
+    useDraggable({
+      id: `issue:${issue.number}`,
+      data: { from: col, issueNumber: issue.number },
+    });
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.6 : 1,
+    touchAction: "manipulation",
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
-      className={`cursor-grab rounded-lg border border-zinc-800 bg-zinc-950 p-3 active:cursor-grabbing border-l-4 ${COLUMN_STYLE[col].cardBorder}`}
+      className={`rounded-lg border border-zinc-800 bg-zinc-950 p-3 border-l-4 ${COLUMN_STYLE[col].cardBorder}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-sm font-medium leading-5">{issue.title}</div>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${COLUMN_STYLE[col].badge}`}
-          title={COLUMN_META[col].label}
+      <div className="flex items-start gap-3">
+        {/* drag handle (better on mobile) */}
+        <button
+          ref={setActivatorNodeRef}
+          {...listeners}
+          {...attributes}
+          className="mt-0.5 select-none rounded-md border border-zinc-800 bg-zinc-900/50 px-2 py-1 text-xs text-zinc-300 active:scale-[0.98]"
+          aria-label="Drag"
+          title="Drag"
         >
-          {COLUMN_META[col].title}
-        </span>
-      </div>
+          Drag
+        </button>
 
-      <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
-        <a
-          href={issue.html_url}
-          target="_blank"
-          rel="noreferrer"
-          className="hover:text-zinc-200"
+        {/* tap area opens details */}
+        <button
+          onClick={() => router.push(`/issue/${issue.number}`)}
+          className="flex-1 text-left"
         >
-          #{issue.number}
-        </a>
-        <span className={issue.state === "closed" ? "text-emerald-300" : ""}>
-          {issue.state}
-        </span>
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-sm font-medium leading-5">{issue.title}</div>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${
+                COLUMN_STYLE[col].badge
+              }`}
+              title={COLUMN_META[col].label}
+            >
+              {COLUMN_META[col].title}
+            </span>
+          </div>
+
+          <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
+            <span className="hover:text-zinc-200">#{issue.number}</span>
+            <span className={issue.state === "closed" ? "text-emerald-300" : ""}>
+              {issue.state}
+            </span>
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -308,6 +335,11 @@ export default function Home() {
     void moveIssue(issueNumber, to).catch((err) => setError(err?.message ?? String(err)));
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } })
+  );
+
   const ready = token && owner && repo;
 
   return (
@@ -430,7 +462,7 @@ export default function Home() {
 
         {ready ? (
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <DndContext onDragEnd={onDragEnd}>
+            <DndContext sensors={sensors} onDragEnd={onDragEnd}>
               {COLUMN_ORDER.map((col) => (
                 <Column key={col} col={col} issues={columns[col]} />
               ))}
