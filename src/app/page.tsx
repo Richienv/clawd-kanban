@@ -28,6 +28,35 @@ const COLUMN_META: Record<
   done: { title: "Done", label: "kb:done" },
 };
 
+const COLUMN_STYLE: Record<
+  ColumnId,
+  {
+    dot: string;
+    header: string;
+    cardBorder: string;
+    badge: string;
+  }
+> = {
+  todo: {
+    dot: "bg-zinc-400",
+    header: "bg-zinc-900/60",
+    cardBorder: "border-l-zinc-400",
+    badge: "bg-zinc-800 text-zinc-200",
+  },
+  doing: {
+    dot: "bg-blue-400",
+    header: "bg-blue-950/25",
+    cardBorder: "border-l-blue-400",
+    badge: "bg-blue-950/50 text-blue-200",
+  },
+  done: {
+    dot: "bg-emerald-400",
+    header: "bg-emerald-950/25",
+    cardBorder: "border-l-emerald-400",
+    badge: "bg-emerald-950/50 text-emerald-200",
+  },
+};
+
 function getStored(key: string, fallback = "") {
   if (typeof window === "undefined") return fallback;
   return window.localStorage.getItem(key) ?? fallback;
@@ -83,9 +112,17 @@ function Card({ issue, col }: { issue: Issue; col: ColumnId }) {
       style={style}
       {...listeners}
       {...attributes}
-      className="cursor-grab rounded-lg border border-zinc-800 bg-zinc-950 p-3 active:cursor-grabbing"
+      className={`cursor-grab rounded-lg border border-zinc-800 bg-zinc-950 p-3 active:cursor-grabbing border-l-4 ${COLUMN_STYLE[col].cardBorder}`}
     >
-      <div className="text-sm font-medium">{issue.title}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-sm font-medium leading-5">{issue.title}</div>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${COLUMN_STYLE[col].badge}`}
+          title={COLUMN_META[col].label}
+        >
+          {COLUMN_META[col].title}
+        </span>
+      </div>
+
       <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
         <a
           href={issue.html_url}
@@ -95,7 +132,7 @@ function Card({ issue, col }: { issue: Issue; col: ColumnId }) {
         >
           #{issue.number}
         </a>
-        <span className={issue.state === "closed" ? "text-green-300" : ""}>
+        <span className={issue.state === "closed" ? "text-emerald-300" : ""}>
           {issue.state}
         </span>
       </div>
@@ -119,8 +156,11 @@ function Column({
         isOver ? "ring-2 ring-zinc-400/40" : ""
       }`}
     >
-      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-        <div className="font-medium">{COLUMN_META[col].title}</div>
+      <div className={`flex items-center justify-between border-b border-zinc-800 px-4 py-3 ${COLUMN_STYLE[col].header}`}>
+        <div className="flex items-center gap-2 font-medium">
+          <span className={`h-2.5 w-2.5 rounded-full ${COLUMN_STYLE[col].dot}`} />
+          {COLUMN_META[col].title}
+        </div>
         <div className="text-xs text-zinc-400">{issues.length}</div>
       </div>
 
