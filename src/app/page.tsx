@@ -170,6 +170,16 @@ export default function Home() {
     setName(getStored("kb:name", "richie"));
   }, []);
 
+  // Persist session to httpOnly cookies so detail pages work reliably on mobile.
+  useEffect(() => {
+    if (!token || !owner || !repo) return;
+    fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, owner, repo }),
+    }).catch(() => {});
+  }, [token, owner, repo]);
+
   // Keep an in-memory copy for mobile webviews that sometimes break localStorage across routes
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -273,6 +283,7 @@ export default function Home() {
                 setToken("");
                 setError(null);
                 setIssues([]);
+                fetch("/api/session", { method: "DELETE" }).catch(() => {});
               }}
               disabled={!token}
               title="Clears the saved token from this browser"
