@@ -15,17 +15,31 @@ type IssueDetail = {
   updated_at?: string;
 };
 
+type ColumnId = "todo" | "doing" | "done";
+
+const COLUMN_META: Record<ColumnId, { title: string; label: string }> = {
+  todo: { title: "Todo", label: "kb:todo" },
+  doing: { title: "Doing", label: "kb:doing" },
+  done: { title: "Done", label: "kb:done" },
+};
+
 function getStored(key: string, fallback = "") {
   if (typeof window === "undefined") return fallback;
   return window.localStorage.getItem(key) ?? fallback;
 }
 
-async function ghFetch<T>(url: string, token: string): Promise<T> {
+async function ghFetch<T>(
+  url: string,
+  token: string,
+  init?: RequestInit
+): Promise<T> {
   const res = await fetch(url, {
+    ...init,
     headers: {
       Accept: "application/vnd.github+json",
       Authorization: `token ${token}`,
       "X-GitHub-Api-Version": "2022-11-28",
+      ...(init?.headers ?? {}),
     },
     cache: "no-store",
   });
@@ -63,24 +77,26 @@ export default function IssuePage({ params }: { params: { number: string } }) {
     setToken(t);
   }, []);
 
-  useEffect(() => {
-    async function load() {
-      if (!token || !owner || !repo || !number) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await ghFetch<IssueDetail>(
-          `https://api.github.com/repos/${owner}/${repo}/issues/${number}`,
-          token
-        );
-        setIssue(data);
-      } catch (e: any) {
-        setError(e?.message ?? String(e));
-      } finally {
-        setLoading(false);
-      }
+  async function load() {
+    if (!token || !owner || !repo || !number) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await ghFetch<IssueDetail>(
+        `https://api.github.com/repos/${owner}/${repo}/issues/${number}`,
+        token
+      );
+      setIssue(data);
+    } catch (e: any) {
+      setError(e?.message ?? String(e));
+    } finally {
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, owner, repo, number]);
 
   return (
@@ -120,7 +136,7 @@ export default function IssuePage({ params }: { params: { number: string } }) {
         ) : null}
 
         {issue ? (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-lg font-semibold leading-6">
@@ -141,7 +157,57 @@ export default function IssuePage({ params }: { params: { number: string } }) {
               </a>
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/* status buttons (replaces drag) */}
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-medium text-zinc-400">Status</div>
+              <div className="grid grid-cols-3 gap-2">
+                {(Object.keys(COLUMN_META) as ColumnId[]).map((c) => {
+                  const active = issue.labels?.some((l) => l.name === COLUMN_META[c].label);
+                  return (
+                    <button
+                      key={c}
+                      className={`rounded-xl border px-3 py-3 text-sm font-medium active:scale-[0.99] ${
+                        active
+                          ? "border-zinc-600 bg-zinc-800 text-zinc-100"
+                          : "border-zinc-800 bg-zinc-950 text-zinc-300"
+                      }`}
+                      onClick={async () => {
+                        if (!token) return;
+                        try {
+                          setError(null);
+                          const other = (Object.keys(COLUMN_META) as ColumnId[])
+                            .map((k) => COLUMN_META[k].label)
+                            .filter((l) => l !== COLUMN_META[c].label);
+                          const existing = (issue.labels ?? [])
+                            .map((l) => l.name)
+                            .filter((n) => !other.includes(n));
+                          const next = Array.from(new Set([...existing, COLUMN_META[c].label]));
+
+                          await ghFetch(
+                            `https://api.github.com/repos/${owner}/${repo}/issues/${issue.number}/labels`,
+                            token,
+                            {
+                              method: "PUT",
+                              body: JSON.stringify(next),
+                            }
+                          );
+                          await load();
+                        } catch (e: any) {
+                          setError(e?.message ?? String(e));
+                        }
+                      }}
+                    >
+                      {COLUMN_META[c].title}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-xs text-zinc-500">
+                Tip: tap a status to move this card.
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
               {issue.labels?.map((l) => (
                 <span
                   key={l.name}

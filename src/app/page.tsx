@@ -1,16 +1,5 @@
 "use client";
 
-import {
-  DndContext,
-  DragEndEvent,
-  PointerSensor,
-  TouchSensor,
-  useDraggable,
-  useDroppable,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -23,7 +12,6 @@ type Issue = {
   html_url: string;
   state: "open" | "closed";
   labels: { name: string }[];
-  // present on PRs; we filter them out
   pull_request?: unknown;
 };
 
@@ -107,84 +95,43 @@ async function ghFetch<T>(
 
 function Card({ issue, col }: { issue: Issue; col: ColumnId }) {
   const router = useRouter();
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
-    useDraggable({
-      id: `issue:${issue.number}`,
-      data: { from: col, issueNumber: issue.number },
-    });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.6 : 1,
-    touchAction: "manipulation",
-  };
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`rounded-lg border border-zinc-800 bg-zinc-950 p-3 border-l-4 ${COLUMN_STYLE[col].cardBorder}`}
+    <button
+      onClick={() => router.push(`/issue/${issue.number}`)}
+      className={`w-full rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-left active:scale-[0.99] border-l-4 ${
+        COLUMN_STYLE[col].cardBorder
+      }`}
+      style={{ touchAction: "manipulation" }}
     >
-      <div className="flex items-start gap-3">
-        {/* drag handle (better on mobile) */}
-        <button
-          ref={setActivatorNodeRef}
-          {...listeners}
-          {...attributes}
-          className="mt-0.5 select-none rounded-md border border-zinc-800 bg-zinc-900/50 px-2 py-1 text-xs text-zinc-300 active:scale-[0.98]"
-          aria-label="Drag"
-          title="Drag"
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-sm font-semibold leading-5 text-zinc-100">
+          {issue.title}
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${COLUMN_STYLE[col].badge}`}
         >
-          Drag
-        </button>
-
-        {/* tap area opens details */}
-        <button
-          onClick={() => router.push(`/issue/${issue.number}`)}
-          className="flex-1 text-left"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="text-sm font-medium leading-5">{issue.title}</div>
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${
-                COLUMN_STYLE[col].badge
-              }`}
-              title={COLUMN_META[col].label}
-            >
-              {COLUMN_META[col].title}
-            </span>
-          </div>
-
-          <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
-            <span className="hover:text-zinc-200">#{issue.number}</span>
-            <span className={issue.state === "closed" ? "text-emerald-300" : ""}>
-              {issue.state}
-            </span>
-          </div>
-        </button>
+          {COLUMN_META[col].title}
+        </span>
       </div>
-    </div>
+      <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
+        <span>#{issue.number}</span>
+        <span className={issue.state === "closed" ? "text-emerald-300" : ""}>
+          {issue.state}
+        </span>
+      </div>
+    </button>
   );
 }
 
-function Column({
-  col,
-  issues,
-}: {
-  col: ColumnId;
-  issues: Issue[];
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: `col:${col}` });
-
+function Column({ col, issues }: { col: ColumnId; issues: Issue[] }) {
   return (
-    <div
-      ref={setNodeRef}
-      className={`rounded-xl border border-zinc-800 bg-zinc-900/40 ${
-        isOver ? "ring-2 ring-zinc-400/40" : ""
-      }`}
-    >
-      <div className={`flex items-center justify-between border-b border-zinc-800 px-4 py-3 ${COLUMN_STYLE[col].header}`}>
-        <div className="flex items-center gap-2 font-medium">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/30 overflow-hidden">
+      <div
+        className={`flex items-center justify-between border-b border-zinc-800 px-4 py-3 ${
+          COLUMN_STYLE[col].header
+        }`}
+      >
+        <div className="flex items-center gap-2 font-semibold">
           <span className={`h-2.5 w-2.5 rounded-full ${COLUMN_STYLE[col].dot}`} />
           {COLUMN_META[col].title}
         </div>
@@ -192,13 +139,13 @@ function Column({
       </div>
 
       <div className="p-3">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {issues.map((i) => (
             <Card key={i.id} issue={i} col={col} />
           ))}
           {issues.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-zinc-800 p-3 text-xs text-zinc-500">
-              Drop an issue here
+            <div className="rounded-xl border border-dashed border-zinc-800 p-4 text-xs text-zinc-500">
+              No items
             </div>
           ) : null}
         </div>
@@ -226,30 +173,20 @@ export default function Home() {
   // Keep an in-memory copy for mobile webviews that sometimes break localStorage across routes
   useEffect(() => {
     if (typeof window === "undefined") return;
-    (window as any).__CLAWD_KANBAN__ = {
-      token,
-      owner,
-      repo,
-      name,
-    };
+    (window as any).__CLAWD_KANBAN__ = { token, owner, repo, name };
   }, [token, owner, repo, name]);
 
   const columns = useMemo(() => {
-    const byColumn: Record<ColumnId, Issue[]> = {
-      todo: [],
-      doing: [],
-      done: [],
-    };
+    const byColumn: Record<ColumnId, Issue[]> = { todo: [], doing: [], done: [] };
 
     for (const issue of issues) {
       if (hasLabel(issue, COLUMN_META.todo.label)) byColumn.todo.push(issue);
       else if (hasLabel(issue, COLUMN_META.doing.label)) byColumn.doing.push(issue);
       else if (hasLabel(issue, COLUMN_META.done.label) || issue.state === "closed")
         byColumn.done.push(issue);
-      else byColumn.todo.push(issue); // default
+      else byColumn.todo.push(issue);
     }
 
-    // stable-ish ordering
     for (const col of COLUMN_ORDER) {
       byColumn[col].sort((a, b) => b.number - a.number);
     }
@@ -294,82 +231,24 @@ export default function Home() {
           }
         );
       } catch {
-        // ignore (already exists or insufficient perms)
+        // ignore
       }
     }
   }
 
-  async function moveIssue(issueNumber: number, to: ColumnId) {
-    const issue = issues.find((x) => x.number === issueNumber);
-    if (!issue) return;
-
-    const targetLabel = COLUMN_META[to].label;
-    const otherLabels = Object.values(COLUMN_META)
-      .map((m) => m.label)
-      .filter((l) => l !== targetLabel);
-
-    const existing = issue.labels
-      .map((l) => l.name)
-      .filter((n) => !otherLabels.includes(n));
-    const next = Array.from(new Set([...existing, targetLabel]));
-
-    await ghFetch(
-      `https://api.github.com/repos/${owner}/${repo}/issues/${issue.number}/labels`,
-      token,
-      {
-        method: "PUT",
-        body: JSON.stringify(next),
-      }
-    );
-
-    // optimistic update
-    setIssues((prev) =>
-      prev.map((x) =>
-        x.number === issue.number
-          ? { ...x, labels: next.map((name) => ({ name })) }
-          : x
-      )
-    );
-  }
-
-  function onDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
-    if (!over) return;
-
-    const overId = String(over.id);
-    if (!overId.startsWith("col:")) return;
-
-    const to = overId.replace("col:", "") as ColumnId;
-    const issueNumber = (active.data.current as any)?.issueNumber as number | undefined;
-    if (!issueNumber) return;
-
-    void moveIssue(issueNumber, to).catch((err) => setError(err?.message ?? String(err)));
-  }
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } })
-  );
-
   const ready = token && owner && repo;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-950 to-black text-zinc-100">
       <div className="mx-auto max-w-6xl px-4 py-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-xl font-semibold">Clawd Kanban</div>
+            <div className="text-xl font-semibold tracking-tight">Clawd Kanban</div>
             <div className="text-sm text-zinc-400">
-              {name ? (
-                <>
-                  Welcome, <span className="text-zinc-200">{name}</span>. Track what I’m working on.
-                </>
-              ) : (
-                <>Track what I’m working on.</>
-              )}
+              Welcome, <span className="text-zinc-200">{name || "richie"}</span>.
             </div>
             <div className="text-sm text-zinc-500">
-              GitHub Issues → Kanban (labels: <code>kb:todo</code>, <code>kb:doing</code>, <code>kb:done</code>)
+              Tap a card to open details. (No drag on mobile.)
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -404,7 +283,7 @@ export default function Home() {
         </div>
 
         {!ready ? (
-          <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
             <div className="mb-3 text-sm text-zinc-300">
               Paste a GitHub token (fine-grained PAT with access to the repo) — stored locally in your browser.
             </div>
@@ -460,29 +339,27 @@ export default function Home() {
               </label>
             </div>
             <div className="mt-3 text-xs text-zinc-500">
-              Tip: create a token with <b>Issues: Read & Write</b> on that repo.
+              Tip: token needs <b>Issues: Read & Write</b> on that repo.
             </div>
           </div>
         ) : null}
 
         {error ? (
-          <div className="mt-4 rounded-lg border border-red-900/40 bg-red-950/30 p-3 text-sm text-red-200">
+          <div className="mt-4 rounded-xl border border-red-900/40 bg-red-950/30 p-3 text-sm text-red-200">
             {error}
           </div>
         ) : null}
 
         {ready ? (
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-              {COLUMN_ORDER.map((col) => (
-                <Column key={col} col={col} issues={columns[col]} />
-              ))}
-            </DndContext>
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            {COLUMN_ORDER.map((col) => (
+              <Column key={col} col={col} issues={columns[col]} />
+            ))}
           </div>
         ) : null}
 
         <div className="mt-8 text-xs text-zinc-500">
-          Add issues in the target repo, then drag cards between columns to update labels.
+          Move status from the issue detail page.
         </div>
       </div>
     </div>
