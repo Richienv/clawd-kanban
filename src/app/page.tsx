@@ -184,6 +184,7 @@ export default function Home() {
   const [token, setToken] = useState("");
   const [owner, setOwner] = useState("");
   const [repo, setRepo] = useState("");
+  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -192,6 +193,7 @@ export default function Home() {
     setToken(getStored("kb:token"));
     setOwner(getStored("kb:owner", "Richienv"));
     setRepo(getStored("kb:repo", "clawd-kanban"));
+    setName(getStored("kb:name", "richie"));
   }, []);
 
   const columns = useMemo(() => {
@@ -315,6 +317,15 @@ export default function Home() {
           <div>
             <div className="text-xl font-semibold">Clawd Kanban</div>
             <div className="text-sm text-zinc-400">
+              {name ? (
+                <>
+                  Welcome, <span className="text-zinc-200">{name}</span>. Track what I’m working on.
+                </>
+              ) : (
+                <>Track what I’m working on.</>
+              )}
+            </div>
+            <div className="text-sm text-zinc-500">
               GitHub Issues → Kanban (labels: <code>kb:todo</code>, <code>kb:doing</code>, <code>kb:done</code>)
             </div>
           </div>
@@ -333,6 +344,19 @@ export default function Home() {
             >
               {loading ? "Refreshing…" : "Refresh"}
             </button>
+            <button
+              className="rounded-lg bg-red-950/40 px-3 py-2 text-sm text-red-200 hover:bg-red-950/60 disabled:opacity-50"
+              onClick={() => {
+                setStored("kb:token", "");
+                setToken("");
+                setError(null);
+                setIssues([]);
+              }}
+              disabled={!token}
+              title="Clears the saved token from this browser"
+            >
+              Log out
+            </button>
           </div>
         </div>
 
@@ -341,7 +365,19 @@ export default function Home() {
             <div className="mb-3 text-sm text-zinc-300">
               Paste a GitHub token (fine-grained PAT with access to the repo) — stored locally in your browser.
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-4">
+              <label className="text-sm">
+                <div className="mb-1 text-zinc-400">Your name</div>
+                <input
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setStored("kb:name", e.target.value);
+                  }}
+                  placeholder="richie"
+                />
+              </label>
               <label className="text-sm">
                 <div className="mb-1 text-zinc-400">Owner</div>
                 <input
